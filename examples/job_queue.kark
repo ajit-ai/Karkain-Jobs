@@ -1,0 +1,14 @@
+// Karkain-Jobs runnable example: a small due-job queue.
+import jobs
+
+func main() {
+    let s = new_job_scheduler()
+    s = schedule(s, "backup", 100)
+    s = schedule(s, "cleanup", 200)
+    s = schedule(s, "report", 300)
+
+    println(describe_job(s, "backup"))
+    println("due_at_150=" + str(len(due_jobs(s, 150))))
+    s = mark_done(s, "backup")
+    println("due_at_150=" + str(len(due_jobs(s, 150))))
+}

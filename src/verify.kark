@@ -1,0 +1,12 @@
+// Integration verification for the Karkain-Jobs public API.
+import jobs
+
+func main() {
+    let s = schedule(schedule(new_job_scheduler(), "cleanup", 5), "sync", 20)
+    assert_eq(job_count(s), 2)
+    let due = due_jobs(s, 10)
+    assert_eq(len(due), 1)
+    println(describe_job(s, due[0]))
+    let done = mark_done(s, "cleanup")
+    assert_eq(job_state(done, "cleanup"), "done")
+}

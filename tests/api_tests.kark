@@ -1,0 +1,55 @@
+// Native tests for Karkain-Jobs.
+
+func sample_jobs() {
+    let s = schedule(new_job_scheduler(), "cleanup", 10)
+    return schedule(s, "report", 20)
+}
+
+func test_new_scheduler() {
+    assert_eq(job_count(new_job_scheduler()), 0)
+    assert_eq(job_state(new_job_scheduler(), "x"), "missing")
+}
+
+func test_schedule() {
+    let s = sample_jobs()
+    assert_eq(job_count(s), 2)
+    assert_eq(job_state(s, "cleanup"), "pending")
+    assert_eq(job_due(s, "report"), 20)
+}
+
+func test_schedule_replaces() {
+    let s = schedule(sample_jobs(), "cleanup", 30)
+    assert_eq(job_count(s), 2)
+    assert_eq(job_due(s, "cleanup"), 30)
+}
+
+func test_due_jobs() {
+    let s = sample_jobs()
+    assert_eq(len(due_jobs(s, 5)), 0)
+    assert_eq(len(due_jobs(s, 10)), 1)
+    assert_eq(due_jobs(s, 10)[0], "cleanup")
+    assert_eq(len(due_jobs(s, 25)), 2)
+}
+
+func test_mark_done() {
+    let s = mark_done(sample_jobs(), "cleanup")
+    assert_eq(job_state(s, "cleanup"), "done")
+    assert_eq(len(due_jobs(s, 100)), 1)
+}
+
+func test_mark_done_unknown() {
+    let s = mark_done(new_job_scheduler(), "x")
+    assert_eq(job_count(s), 0)
+}
+
+func test_cancel_job() {
+    let s = cancel_job(sample_jobs(), "cleanup")
+    assert_eq(job_count(s), 1)
+    assert_eq(job_state(s, "cleanup"), "missing")
+}
+
+func test_describe_job() {
+    let s = sample_jobs()
+    assert_eq(describe_job(s, "cleanup"), "cleanup@10:pending")
+    assert_eq(describe_job(s, "x"), "x@0:missing")
+}

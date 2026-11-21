@@ -1,0 +1,7 @@
+name = "karkain-jobs"
+version = "0.1.0-dev"
+description = "Scheduled and background job model for Karkain"
+license = "MIT"
+targets = ["native"]
+
+[dependencies]

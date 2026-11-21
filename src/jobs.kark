@@ -1,0 +1,111 @@
+// Karkain-Jobs - scheduled and background job model.
+// Karkain Language v1.2.0 verified baseline (tag v1.2.0,
+// commit 77d70693e1e3134dac312a303bffafa7d50fa988).
+//
+// Scope boundary: this framework records schedule metadata and due-state
+// in portable Karkain. It does not run timers or background threads; a
+// host loop supplies the current time and drives execution.
+//
+// Representation: triples [name, due, state, ...].
+
+// new_job_scheduler returns an empty scheduler.
+public func new_job_scheduler() {
+    return []
+}
+
+// schedule adds or replaces a pending job with a due value.
+public func schedule(scheduler, name, due) {
+    let out = cancel_job(scheduler, name)
+    out = push(out, name)
+    out = push(out, due)
+    out = push(out, "pending")
+    return out
+}
+
+// cancel_job removes a job by marking it cancelled.
+public func cancel_job(scheduler, name) {
+    let out = []
+    let i = 0
+    while (i < len(scheduler)) {
+        if scheduler[i] == name {
+            i = i + 3
+        } else {
+            out = push(out, scheduler[i])
+            out = push(out, scheduler[i + 1])
+            out = push(out, scheduler[i + 2])
+            i = i + 3
+        }
+    }
+    return out
+}
+
+// job_count returns the number of tracked jobs.
+public func job_count(scheduler) {
+    return len(scheduler) / 3
+}
+
+// job_state returns a job state or "missing".
+public func job_state(scheduler, name) {
+    let i = 0
+    while (i < len(scheduler)) {
+        if scheduler[i] == name {
+            return scheduler[i + 2]
+        }
+        i = i + 3
+    }
+    return "missing"
+}
+
+// job_due returns the due value or 0 when absent.
+public func job_due(scheduler, name) {
+    let i = 0
+    while (i < len(scheduler)) {
+        if scheduler[i] == name {
+            return scheduler[i + 1]
+        }
+        i = i + 3
+    }
+    return 0
+}
+
+// due_jobs returns names of pending jobs whose due value <= now.
+public func due_jobs(scheduler, now) {
+    let out = []
+    let i = 0
+    while (i < len(scheduler)) {
+        if scheduler[i + 2] == "pending" {
+            if scheduler[i + 1] <= now {
+                out = push(out, scheduler[i])
+            }
+        }
+        i = i + 3
+    }
+    return out
+}
+
+// mark_done marks a job as done.
+public func mark_done(scheduler, name) {
+    if job_state(scheduler, name) == "missing" {
+        return scheduler
+    }
+    let out = []
+    let i = 0
+    while (i < len(scheduler)) {
+        if scheduler[i] == name {
+            out = push(out, scheduler[i])
+            out = push(out, scheduler[i + 1])
+            out = push(out, "done")
+        } else {
+            out = push(out, scheduler[i])
+            out = push(out, scheduler[i + 1])
+            out = push(out, scheduler[i + 2])
+        }
+        i = i + 3
+    }
+    return out
+}
+
+// describe_job builds a one-line job diagnostic.
+public func describe_job(scheduler, name) {
+    return name + "@" + str(job_due(scheduler, name)) + ":" + job_state(scheduler, name)
+}
