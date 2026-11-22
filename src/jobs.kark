@@ -109,3 +109,209 @@ public func mark_done(scheduler, name) {
 public func describe_job(scheduler, name) {
     return name + "@" + str(job_due(scheduler, name)) + ":" + job_state(scheduler, name)
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2 additions. Phase 1 job scheduler API is unchanged. Execution is
+// in-process scheduling metadata; durable queues, background execution and
+// distributed workers are BLOCKED without a qualified provider/runtime.
+
+// new_job_def creates a job definition with payload and kind.
+public func new_job_def(id, payload, kind) {
+    let j = []
+    j = push(j, id)
+    j = push(j, payload)
+    j = push(j, kind)
+    return j
+}
+
+// job_payload returns a job payload.
+public func job_payload(definition) { return definition[1] }
+
+// job_kind returns a job kind.
+public func job_kind(definition) { return definition[2] }
+
+// validate_job rejects empty payload or kind.
+public func validate_job(definition) {
+    if len(job_payload(definition)) == 0 { return false }
+    if len(job_kind(definition)) == 0 { return false }
+    return true
+}
+
+// new_worker declares a worker with capacity.
+public func new_worker(id, capacity) {
+    let w = []
+    w = push(w, id)
+    w = push(w, capacity)
+    return w
+}
+
+// worker_capacity returns a worker capacity.
+public func worker_capacity(worker) { return worker[1] }
+
+// worker_can_accept reports whether a worker has free capacity.
+public func worker_can_accept(worker, active) { return active < worker_capacity(worker) }
+
+// new_priorities creates a job priority store.
+public func new_priorities() {
+    return []
+}
+
+// set_job_priority records a job priority.
+public func set_job_priority(priorities, name, priority) {
+    let out = []
+    out = push(out, name)
+    out = push(out, priority)
+    let i = 0
+    while (i < len(priorities)) {
+        if priorities[i] == name {
+            i = i + 2
+        } else {
+            out = push(out, priorities[i])
+            out = push(out, priorities[i + 1])
+            i = i + 2
+        }
+    }
+    return out
+}
+
+// job_priority returns a job priority or 0.
+public func job_priority(priorities, name) {
+    let i = 0
+    while (i < len(priorities)) {
+        if priorities[i] == name { return priorities[i + 1] }
+        i = i + 2
+    }
+    return 0
+}
+
+// next_by_priority returns the highest-priority pending job.
+public func next_by_priority(scheduler, priorities) {
+    let best = ""
+    let value = -1
+    let i = 0
+    while (i < len(scheduler)) {
+        if scheduler[i + 2] == "pending" {
+            let p = job_priority(priorities, scheduler[i])
+            if p > value {
+                value = p
+                best = scheduler[i]
+            }
+        }
+        i = i + 3
+    }
+    return best
+}
+
+// recurring_interval returns an interval marker for a recurring job.
+public func recurring_interval(name, interval) {
+    return name + ":every:" + str(interval)
+}
+
+// next_run computes a next due value from now and an interval.
+public func next_run(now, interval) { return now + interval }
+
+// new_backoff creates a retry backoff policy.
+public func new_backoff(base, maximum) {
+    let b = []
+    b = push(b, base)
+    b = push(b, maximum)
+    return b
+}
+
+// backoff_delay computes a bounded exponential delay.
+public func backoff_delay(policy, attempts) {
+    let delay = policy[0]
+    let i = 1
+    while (i < attempts) {
+        delay = delay * 2
+        i = i + 1
+    }
+    if delay > policy[1] { return policy[1] }
+    return delay
+}
+
+// classify_job_failure maps a failure code to a class.
+public func classify_job_failure(code) {
+    if code == 1 { return "transient" }
+    if code == 2 { return "permanent" }
+    return "unknown"
+}
+
+// new_dead_letters creates a dead-letter store.
+public func new_dead_letters() {
+    return []
+}
+
+// dead_letter_job records a failed job and reason.
+public func dead_letter_job(letters, name, reason) {
+    let out = letters
+    out = push(out, name)
+    out = push(out, reason)
+    return out
+}
+
+// dead_letter_count returns the number of dead-lettered jobs.
+public func dead_letter_count(letters) { return len(letters) / 2 }
+
+// new_idempotency creates a submission-id store.
+public func new_idempotency() {
+    return []
+}
+
+// mark_submitted records a submission key.
+public func mark_submitted(store, key) {
+    if is_duplicate(store, key) { return store }
+    return push(store, key)
+}
+
+// is_duplicate reports whether a submission key was seen.
+public func is_duplicate(store, key) {
+    let i = 0
+    while (i < len(store)) {
+        if store[i] == key { return true }
+        i = i + 1
+    }
+    return false
+}
+
+// new_job_result builds a structured job result.
+public func new_job_result(id, ok, value, code) {
+    let r = []
+    r = push(r, id)
+    r = push(r, ok)
+    r = push(r, value)
+    r = push(r, code)
+    return r
+}
+
+// job_result_ok reports whether a job succeeded.
+public func job_result_ok(result) { return result[1] }
+
+// shutdown_policy creates a worker shutdown policy.
+public func shutdown_policy(drain) {
+    let p = []
+    p = push(p, drain)
+    return p
+}
+
+// worker_drains reports whether active jobs should drain.
+public func worker_drains(policy) { return policy[0] }
+
+// new_durable_provider declares a durable queue provider.
+public func new_durable_provider(name, capabilities) {
+    let p = []
+    p = push(p, name)
+    p = push(p, capabilities)
+    return p
+}
+
+// durable_supports reports whether a capability is advertised.
+public func durable_supports(provider, capability) {
+    return contains(provider[1], capability)
+}
+
+// durable_contract documents the missing durable provider operation.
+public func durable_contract() { return "provider.queue.enqueue/dequeue/ack" }
+
+// event_contract documents Jobs to Event integration.
+public func event_contract() { return "event.publish(job,id,status)" }

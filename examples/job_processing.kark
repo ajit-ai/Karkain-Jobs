@@ -1,0 +1,16 @@
+// Karkain-Jobs Phase 2 example: priorities, backoff and idempotency.
+import jobs
+
+func main() {
+    let scheduler = schedule(schedule(new_job_scheduler(), "low", 10), "high", 10)
+    let p = set_job_priority(set_job_priority(new_priorities(), "low", 1), "high", 9)
+    println("next=" + jobs.next_by_priority(scheduler, p))
+
+    let backoff = new_backoff(2, 16)
+    println("delay=" + str(backoff_delay(backoff, 3)))
+
+    let seen = mark_submitted(new_idempotency(), "job-1")
+    println("duplicate=" + str(is_duplicate(seen, "job-1")))
+    println("drain=" + str(worker_drains(shutdown_policy(true))))
+    println("durable=" + str(durable_supports(new_durable_provider("test", "enqueue"), "durable")))
+}

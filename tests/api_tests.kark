@@ -53,3 +53,83 @@ func test_describe_job() {
     assert_eq(describe_job(s, "cleanup"), "cleanup@10:pending")
     assert_eq(describe_job(s, "x"), "x@0:missing")
 }
+
+// --- Phase 2 regression ---
+
+func test_phase1_regression() {
+    let s = schedule(new_job_scheduler(), "cleanup", 10)
+    assert_eq(job_count(s), 1)
+    assert_eq(job_state(s, "cleanup"), "pending")
+    assert_eq(len(due_jobs(s, 10)), 1)
+    assert_eq(job_state(mark_done(s, "cleanup"), "cleanup"), "done")
+}
+
+// --- Phase 2 additions ---
+
+func test_job_definitions() {
+    let j = new_job_def("j1", "payload", "email")
+    assert_eq(job_payload(j), "payload")
+    assert_eq(job_kind(j), "email")
+    assert(validate_job(j))
+    assert(validate_job(new_job_def("x", "", "email")) == false)
+}
+
+func test_workers() {
+    let w = new_worker("w1", 3)
+    assert_eq(worker_capacity(w), 3)
+    assert(worker_can_accept(w, 2))
+    assert(worker_can_accept(w, 3) == false)
+}
+
+func test_priorities() {
+    let s = schedule(schedule(new_job_scheduler(), "low", 10), "high", 10)
+    let p = set_job_priority(set_job_priority(new_priorities(), "low", 1), "high", 9)
+    assert_eq(job_priority(p, "high"), 9)
+    assert_eq(job_priority(p, "none"), 0)
+    assert_eq(next_by_priority(s, p), "high")
+}
+
+func test_recurring_and_next_run() {
+    assert_eq(recurring_interval("tick", 5), "tick:every:5")
+    assert_eq(next_run(10, 5), 15)
+}
+
+func test_backoff() {
+    let b = new_backoff(2, 16)
+    assert_eq(backoff_delay(b, 1), 2)
+    assert_eq(backoff_delay(b, 3), 8)
+    assert_eq(backoff_delay(b, 10), 16)
+}
+
+func test_failure_and_dead_letters() {
+    assert_eq(classify_job_failure(1), "transient")
+    assert_eq(classify_job_failure(2), "permanent")
+    assert_eq(classify_job_failure(9), "unknown")
+    let d = dead_letter_job(dead_letter_job(new_dead_letters(), "a", "timeout"), "b", "invalid")
+    assert_eq(dead_letter_count(d), 2)
+    assert_eq(d[1], "timeout")
+}
+
+func test_idempotency() {
+    let s = mark_submitted(mark_submitted(new_idempotency(), "key1"), "key2")
+    assert(is_duplicate(s, "key1"))
+    assert(is_duplicate(s, "key2"))
+    assert(is_duplicate(s, "none") == false)
+    assert_eq(len(mark_submitted(s, "key1")), 2)
+}
+
+func test_results_and_shutdown() {
+    let r = new_job_result("j1", true, "done", 0)
+    assert(job_result_ok(r))
+    assert_eq(r[2], "done")
+    assert(worker_drains(shutdown_policy(true)))
+    assert(worker_drains(shutdown_policy(false)) == false)
+}
+
+func test_provider_contracts() {
+    let p = new_durable_provider("test", "enqueue,ack")
+    assert(durable_supports(p, "enqueue"))
+    assert(durable_supports(p, "durable") == false)
+    assert_eq(durable_contract(), "provider.queue.enqueue/dequeue/ack")
+    assert_eq(event_contract(), "event.publish(job,id,status)")
+}
